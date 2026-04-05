@@ -1,0 +1,29 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.KdexMusicPlayer" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Catppuccin Mocha with Pink accent -->
+        <item name="colorPrimary">@color/cat_pink</item>
+        <item name="colorOnPrimary">@color/cat_crust</item>
+        <item name="colorPrimaryContainer">@color/cat_surface1</item>
+        <item name="colorOnPrimaryContainer">@color/cat_pink</item>
+
+        <item name="colorSecondary">@color/cat_flamingo</item>
+        <item name="colorOnSecondary">@color/cat_crust</item>
+        <item name="colorSecondaryContainer">@color/cat_surface1</item>
+        <item name="colorOnSecondaryContainer">@color/cat_flamingo</item>
+
+        <item name="colorTertiary">@color/cat_teal</item>
+        <item name="colorOnTertiary">@color/cat_crust</item>
+
+        <!-- Greyish dark background (Surface0) -->
+        <item name="android:windowBackground">@color/cat_surface0</item>
+        <item name="colorSurface">@color/cat_surface0</item>
+        <item name="colorOnSurface">@color/cat_text</item>
+        <item name="colorSurfaceVariant">@color/cat_surface1</item>
+        <item name="colorOnSurfaceVariant">@color/cat_subtext1</item>
+
+        <item name="colorOutline">@color/cat_overlay0</item>
+    </style>
+
+    <style name="Theme.KdexMusicPlayer" parent="Base.Theme.KdexMusicPlayer" />
+</resources>
