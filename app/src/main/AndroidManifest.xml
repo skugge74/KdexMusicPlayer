@@ -20,6 +20,7 @@
             android:name=".PlaybackService"
             android:enabled="true"
             android:exported="true"
+            android:theme="@style/Theme.KdexMusicPlayer"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />

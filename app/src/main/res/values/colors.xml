@@ -1,33 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Catppuccin Mocha Palette -->
-    <color name="cat_rosewater">#f5e0dc</color>
-    <color name="cat_flamingo">#f2cdcd</color>
-    <color name="cat_pink">#f5c2e7</color>
-    <color name="cat_mauve">#cba6f7</color>
-    <color name="cat_red">#f38ba8</color>
-    <color name="cat_maroon">#eba0ac</color>
-    <color name="cat_peach">#fab387</color>
-    <color name="cat_yellow">#f9e2af</color>
-    <color name="cat_green">#a6e3a1</color>
-    <color name="cat_teal">#94e2d5</color>
-    <color name="cat_sky">#89dceb</color>
-    <color name="cat_sapphire">#74c7ec</color>
-    <color name="cat_blue">#89b4fa</color>
-    <color name="cat_lavender">#b4befe</color>
-    <color name="cat_text">#cdd6f4</color>
-    <color name="cat_subtext1">#bac2de</color>
-    <color name="cat_subtext0">#a6adc8</color>
-    <color name="cat_overlay2">#9399b2</color>
-    <color name="cat_overlay1">#7f849c</color>
-    <color name="cat_overlay0">#6c7086</color>
-    <color name="cat_surface2">#585b70</color>
-    <color name="cat_surface1">#45475a</color>
-    <color name="cat_surface0">#313244</color>
-    <color name="cat_base">#1e1e2e</color>
-    <color name="cat_mantle">#181825</color>
-    <color name="cat_crust">#11111b</color>
+    <!-- Vibrant Dark Palette -->
+    <color name="vibrant_red">#A11E2D</color>
+    <color name="vibrant_blue">#2979FF</color>
+    <color name="vibrant_green">#00E676</color>
+    <color name="vibrant_yellow">#FFEA00</color>
+    <color name="vibrant_orange">#FF9100</color>
+    <color name="vibrant_purple">#D500F9</color>
+
+    <color name="deep_dark_base">#080808</color>
+    <color name="deep_dark_surface">#121212</color>
+    <color name="deep_dark_surface_variant">#1E1E1E</color>
+
+    <color name="text_high_emphasis">#FFFFFF</color>
+    <color name="text_medium_emphasis">#B3FFFFFF</color>
+    <color name="text_low_emphasis">#80FFFFFF</color>
 
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Compatibility aliases for Java code -->
+    <color name="cat_red">@color/vibrant_red</color>
+    <color name="cat_pink">@color/vibrant_red</color>
+    <color name="cat_mauve">@color/vibrant_purple</color>
+    <color name="cat_text">@color/text_high_emphasis</color>
+    <color name="cat_subtext1">@color/text_medium_emphasis</color>
+    <color name="cat_subtext0">@color/text_low_emphasis</color>
+
+    <color name="cat_surface0">@color/deep_dark_surface</color>
+    <color name="cat_surface1">@color/deep_dark_surface_variant</color>
+    <color name="cat_surface2">@color/deep_dark_surface_variant</color>
+    <color name="cat_base">@color/deep_dark_base</color>
+    <color name="cat_mantle">@color/black</color>
+    <color name="cat_crust">@color/black</color>
 </resources>

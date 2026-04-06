@@ -1,28 +1,28 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.KdexMusicPlayer" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Catppuccin Mocha with Red accent -->
-        <item name="colorPrimary">@color/cat_red</item>
-        <item name="colorOnPrimary">@color/cat_crust</item>
-        <item name="colorPrimaryContainer">@color/cat_surface1</item>
-        <item name="colorOnPrimaryContainer">@color/cat_red</item>
+        <!-- Vibrant Dark Theme -->
+        <item name="colorPrimary">@color/vibrant_red</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorPrimaryContainer">@color/deep_dark_surface_variant</item>
+        <item name="colorOnPrimaryContainer">@color/vibrant_red</item>
 
-        <item name="colorSecondary">@color/cat_flamingo</item>
-        <item name="colorOnSecondary">@color/cat_crust</item>
-        <item name="colorSecondaryContainer">@color/cat_surface1</item>
-        <item name="colorOnSecondaryContainer">@color/cat_flamingo</item>
+        <item name="colorSecondary">@color/vibrant_blue</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/deep_dark_surface_variant</item>
+        <item name="colorOnSecondaryContainer">@color/vibrant_blue</item>
 
-        <item name="colorTertiary">@color/cat_teal</item>
-        <item name="colorOnTertiary">@color/cat_crust</item>
+        <item name="colorTertiary">@color/vibrant_green</item>
+        <item name="colorOnTertiary">@color/black</item>
 
-        <!-- Greyish dark background (Surface0) -->
-        <item name="android:windowBackground">@color/cat_surface0</item>
-        <item name="colorSurface">@color/cat_surface0</item>
-        <item name="colorOnSurface">@color/cat_text</item>
-        <item name="colorSurfaceVariant">@color/cat_surface1</item>
-        <item name="colorOnSurfaceVariant">@color/cat_subtext1</item>
+        <!-- True Dark background -->
+        <item name="android:windowBackground">@color/deep_dark_base</item>
+        <item name="colorSurface">@color/deep_dark_surface</item>
+        <item name="colorOnSurface">@color/text_high_emphasis</item>
+        <item name="colorSurfaceVariant">@color/deep_dark_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/text_medium_emphasis</item>
 
-        <item name="colorOutline">@color/cat_overlay0</item>
+        <item name="colorOutline">@color/deep_dark_surface_variant</item>
     </style>
 
     <style name="Theme.KdexMusicPlayer" parent="Base.Theme.KdexMusicPlayer" />

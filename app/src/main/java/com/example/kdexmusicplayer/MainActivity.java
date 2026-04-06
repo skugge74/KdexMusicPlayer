@@ -64,9 +64,17 @@ import java.util.concurrent.ExecutionException;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import androidx.media3.common.util.UnstableApi;
+
+@UnstableApi
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
+    private String lastLoadedMediaId = null;
 
     private MusicLibrary musicLibrary;
     private RecyclerView recyclerView;
@@ -401,86 +409,104 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadMusic() {
-        musicLibrary.getAllTracks().clear();
-        ContentResolver contentResolver = getContentResolver();
-        Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
-        
-        String folderPath = null;
-        if (selectedLibraryPath != null) {
-            Uri treeUri = Uri.parse(selectedLibraryPath);
-            String path = treeUri.getPath();
-            if (path != null && path.contains(":")) {
-                folderPath = path.split(":")[1];
-            }
-        }
-
-        try (Cursor cursor = contentResolver.query(uri, null, selection, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                int idColumn = cursor.getColumnIndex(MediaStore.Audio.Media._ID);
-                int titleColumn = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
-                int artistColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
-                int albumIdColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
-                int dataColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA);
-                int dateAddedColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED);
-
-                do {
-                    String dataPath = cursor.getString(dataColumn);
-                    long dateAdded = cursor.getLong(dateAddedColumn) * 1000; // MediaStore stores in seconds, we use ms
-                    
-                    if (folderPath != null) {
-                        if (dataPath == null || !dataPath.contains(folderPath)) {
-                            continue;
-                        }
-                    }
-
-                    long id = cursor.getLong(idColumn);
-                    String title = cursor.getString(titleColumn);
-                    String artist = cursor.getString(artistColumn);
-                    long albumId = cursor.getLong(albumIdColumn);
-                    Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
-                    String trackUriString = contentUri.toString();
-                    
-                    // Check if track exists in DB to preserve tags/edits
-                    MusicTrack track = db.trackDao().getByPath(trackUriString);
-                    if (track == null) {
-                        track = new MusicTrack(title, artist, trackUriString, albumId, dateAdded);
-                        db.trackDao().insert(track);
-                    } else if (track.getAlbumId() == 0) {
-                        // Handle tracks previously saved without albumId
-                        track.setAlbumId(albumId);
-                        db.trackDao().update(track);
-                    }
-                    musicLibrary.addTrack(track);
-                } while (cursor.moveToNext());
-            }
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "Error loading music", e);
-        }
-
-        adapter = new TrackAdapter(musicLibrary.getAllTracks(), 
-            (track, position) -> playTrack(position),
-            (track, position) -> { /* Long click ignored */ },
-            (track, position) -> showEditTrackDialog(track, position));
-        
-        // Default sort by date added (newest first)
-        adapter.sortByDateAdded();
-
-        recyclerView.setAdapter(adapter);
-
-        String lastPlayedPath = getSharedPreferences("MusicPlayerPrefs", MODE_PRIVATE).getString("last_played_path", null);
-        if (lastPlayedPath != null) {
-            adapter.setSelectedTrackPath(lastPlayedPath);
-            // Optionally scroll to it
-            for (int i = 0; i < musicLibrary.getAllTracks().size(); i++) {
-                if (musicLibrary.getAllTracks().get(i).getFilePath().equals(lastPlayedPath)) {
-                    recyclerView.scrollToPosition(i);
-                    break;
+        backgroundExecutor.execute(() -> {
+            List<MusicTrack> loadedTracks = new ArrayList<>();
+            ContentResolver contentResolver = getContentResolver();
+            Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+            String selection = MediaStore.Audio.Media.IS_MUSIC + "!= 0";
+            
+            String folderPath = null;
+            if (selectedLibraryPath != null) {
+                Uri treeUri = Uri.parse(selectedLibraryPath);
+                String path = treeUri.getPath();
+                if (path != null && path.contains(":")) {
+                    folderPath = path.split(":")[1];
                 }
             }
-        }
 
-        refreshDrawerTags();
+            // Optimization: Get all existing tracks from DB once
+            List<MusicTrack> existingTracks = db.trackDao().getAll();
+            java.util.Map<String, MusicTrack> trackMap = new java.util.HashMap<>();
+            for (MusicTrack t : existingTracks) {
+                trackMap.put(t.getFilePath(), t);
+            }
+
+            List<MusicTrack> newTracksToInsert = new ArrayList<>();
+            List<MusicTrack> tracksToUpdate = new ArrayList<>();
+
+            try (Cursor cursor = contentResolver.query(uri, null, selection, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int idColumn = cursor.getColumnIndex(MediaStore.Audio.Media._ID);
+                    int titleColumn = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
+                    int artistColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
+                    int albumIdColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
+                    int dataColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA);
+                    int dateAddedColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED);
+
+                    do {
+                        String dataPath = cursor.getString(dataColumn);
+                        if (folderPath != null && (dataPath == null || !dataPath.contains(folderPath))) {
+                            continue;
+                        }
+
+                        long id = cursor.getLong(idColumn);
+                        Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
+                        String trackUriString = contentUri.toString();
+                        
+                        MusicTrack track = trackMap.get(trackUriString);
+                        if (track == null) {
+                            String title = cursor.getString(titleColumn);
+                            String artist = cursor.getString(artistColumn);
+                            long albumId = cursor.getLong(albumIdColumn);
+                            long dateAdded = cursor.getLong(dateAddedColumn) * 1000;
+                            
+                            track = new MusicTrack(title, artist, trackUriString, albumId, dateAdded);
+                            newTracksToInsert.add(track);
+                        } else if (track.getAlbumId() == 0) {
+                            track.setAlbumId(cursor.getLong(albumIdColumn));
+                            tracksToUpdate.add(track);
+                        }
+                        loadedTracks.add(track);
+                    } while (cursor.moveToNext());
+                }
+            }
+
+            // Batch database operations
+            if (!newTracksToInsert.isEmpty()) {
+                db.trackDao().insertAll(newTracksToInsert);
+            }
+            for (MusicTrack t : tracksToUpdate) {
+                db.trackDao().update(t);
+            }
+
+            runOnUiThread(() -> {
+                musicLibrary.getAllTracks().clear();
+                musicLibrary.getAllTracks().addAll(loadedTracks);
+                
+                if (adapter == null) {
+                    adapter = new TrackAdapter(musicLibrary.getAllTracks(), 
+                        (track, position) -> playTrack(position),
+                        (track, position) -> { /* Long click ignored */ },
+                        (track, position) -> showEditTrackDialog(track, position));
+                    recyclerView.setAdapter(adapter);
+                } else {
+                    adapter.setTracks(musicLibrary.getAllTracks());
+                }
+                
+                adapter.sortByDateAdded();
+
+                String lastPlayedPath = getSharedPreferences("MusicPlayerPrefs", MODE_PRIVATE).getString("last_played_path", null);
+                if (lastPlayedPath != null) {
+                    adapter.setSelectedTrackPath(lastPlayedPath);
+                    for (int i = 0; i < musicLibrary.getAllTracks().size(); i++) {
+                        if (musicLibrary.getAllTracks().get(i).getFilePath().equals(lastPlayedPath)) {
+                            recyclerView.scrollToPosition(i);
+                            break;
+                        }
+                    }
+                }
+            });
+        });
     }
 
     private void setupPlaylistDrawer(ImageButton addPlaylistButton, Button allTracksButton) {
@@ -658,9 +684,52 @@ public class MainActivity extends AppCompatActivity {
         View btnEdit = view.findViewById(R.id.btnEditInfo);
         View btnAddPlaylist = view.findViewById(R.id.btnAddToPlaylist);
         View btnRemoveFromPlaylist = view.findViewById(R.id.btnRemoveFromPlaylist);
+        View btnPlayNext = view.findViewById(R.id.btnPlayNext);
+        View btnAddToQueue = view.findViewById(R.id.btnAddToQueue);
 
         title.setText(track.getTitle());
         artist.setText(track.getArtist());
+
+        btnPlayNext.setOnClickListener(v -> {
+            if (mediaController != null) {
+                Uri artworkUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.getAlbumId());
+                MediaMetadata metadata = new MediaMetadata.Builder()
+                        .setTitle(track.getTitle())
+                        .setArtist(track.getArtist())
+                        .setArtworkUri(artworkUri)
+                        .build();
+                MediaItem mediaItem = new MediaItem.Builder()
+                        .setMediaId(track.getFilePath())
+                        .setUri(Uri.parse(track.getFilePath()))
+                        .setMediaMetadata(metadata)
+                        .build();
+                
+                int nextIndex = mediaController.getCurrentMediaItemIndex() + 1;
+                mediaController.addMediaItem(nextIndex, mediaItem);
+                Toast.makeText(this, "Playing next: " + track.getTitle(), Toast.LENGTH_SHORT).show();
+            }
+            bottomSheetDialog.dismiss();
+        });
+
+        btnAddToQueue.setOnClickListener(v -> {
+            if (mediaController != null) {
+                Uri artworkUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.getAlbumId());
+                MediaMetadata metadata = new MediaMetadata.Builder()
+                        .setTitle(track.getTitle())
+                        .setArtist(track.getArtist())
+                        .setArtworkUri(artworkUri)
+                        .build();
+                MediaItem mediaItem = new MediaItem.Builder()
+                        .setMediaId(track.getFilePath())
+                        .setUri(Uri.parse(track.getFilePath()))
+                        .setMediaMetadata(metadata)
+                        .build();
+                
+                mediaController.addMediaItem(mediaItem);
+                Toast.makeText(this, "Added to queue: " + track.getTitle(), Toast.LENGTH_SHORT).show();
+            }
+            bottomSheetDialog.dismiss();
+        });
         
         if (currentPlaylistId != -1) {
             btnRemoveFromPlaylist.setVisibility(View.VISIBLE);
@@ -811,32 +880,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playTrack(int position) {
-        if (mediaController != null) {
-            mediaController.stop();
-            mediaController.clearMediaItems();
-            
-            List<MusicTrack> playlist = adapter.getTracks();
-            for (MusicTrack t : playlist) {
-                Uri artworkUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), t.getAlbumId());
-                MediaMetadata metadata = new MediaMetadata.Builder()
-                        .setTitle(t.getTitle())
-                        .setArtist(t.getArtist())
-                        .setArtworkUri(artworkUri)
-                        .build();
+        if (mediaController == null) return;
 
-                MediaItem mediaItem = new MediaItem.Builder()
-                        .setMediaId(t.getFilePath())
-                        .setUri(Uri.parse(t.getFilePath()))
-                        .setMediaMetadata(metadata)
-                        .build();
-                mediaController.addMediaItem(mediaItem);
+        List<MusicTrack> currentAdapterTracks = adapter.getTracks();
+        if (position < 0 || position >= currentAdapterTracks.size()) return;
+
+        // Optimization: If the queue is already the same, just seek.
+        // This is the "Compromise": Saves massive battery/CPU on large libraries.
+        if (mediaController.getMediaItemCount() == currentAdapterTracks.size()) {
+            MediaItem itemInController = mediaController.getMediaItemAt(position);
+            if (itemInController != null && itemInController.mediaId.equals(currentAdapterTracks.get(position).getFilePath())) {
+                mediaController.seekTo(position, 0);
+                mediaController.play();
+                return;
             }
-            
-            mediaController.seekTo(position, 0);
-            mediaController.prepare();
-            mediaController.play();
-            updateUI(); // Immediate UI update
         }
+
+        mediaController.stop();
+        mediaController.clearMediaItems();
+
+        List<MusicTrack> playlist = new ArrayList<>(currentAdapterTracks);
+        backgroundExecutor.execute(() -> {
+                List<MediaItem> mediaItems = new ArrayList<>();
+                for (MusicTrack t : playlist) {
+                    Uri artworkUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), t.getAlbumId());
+                    MediaMetadata metadata = new MediaMetadata.Builder()
+                            .setTitle(t.getTitle())
+                            .setArtist(t.getArtist())
+                            .setArtworkUri(artworkUri)
+                            .build();
+
+                    MediaItem mediaItem = new MediaItem.Builder()
+                            .setMediaId(t.getFilePath())
+                            .setUri(Uri.parse(t.getFilePath()))
+                            .setMediaMetadata(metadata)
+                            .build();
+                    mediaItems.add(mediaItem);
+                }
+                
+                runOnUiThread(() -> {
+                    mediaController.addMediaItems(mediaItems);
+                    mediaController.seekTo(position, 0);
+                    mediaController.prepare();
+                    mediaController.play();
+                    updateUI();
+                });
+            });
     }
 
     @Override
@@ -854,8 +943,16 @@ public class MainActivity extends AppCompatActivity {
                 mediaController = controllerFuture.get();
                 mediaController.addListener(new Player.Listener() {
                     @Override
-                    public void onIsPlayingChanged(boolean isPlaying) {
-                        playPauseButton.setImageResource(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play);
+                    public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
+                        if (events.containsAny(
+                                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                                Player.EVENT_IS_PLAYING_CHANGED,
+                                Player.EVENT_REPEAT_MODE_CHANGED,
+                                Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED)) {
+                            updateUI();
+                        }
                     }
 
                     @Override
@@ -863,33 +960,6 @@ public class MainActivity extends AppCompatActivity {
                         if (mediaItem != null && mediaItem.mediaId != null) {
                             getSharedPreferences("MusicPlayerPrefs", MODE_PRIVATE)
                                 .edit().putString("last_played_path", mediaItem.mediaId).apply();
-                        }
-                        
-                        if (mediaItem != null && mediaItem.mediaMetadata.title != null) {
-                            currentTrackTitle.setText(mediaItem.mediaMetadata.title);
-                            currentTrackArtist.setText(mediaItem.mediaMetadata.artist);
-                            
-                            if (adapter != null) {
-                                adapter.setSelectedTrackPath(mediaItem.mediaId);
-                            }
-
-                            if (mediaItem.mediaMetadata.artworkUri != null) {
-                                Glide.with(MainActivity.this)
-                                        .load(mediaItem.mediaMetadata.artworkUri)
-                                        .transition(DrawableTransitionOptions.withCrossFade())
-                                        .placeholder(R.drawable.ic_launcher_foreground)
-                                        .into(albumArt);
-                            } else {
-                                albumArt.setImageResource(R.drawable.ic_launcher_foreground);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onPlaybackStateChanged(int playbackState) {
-                        if (playbackState == Player.STATE_READY) {
-                            playbackSeekBar.setMax((int) mediaController.getDuration());
-                            totalTime.setText(formatTime((int) mediaController.getDuration()));
                         }
                     }
                 });
@@ -947,17 +1017,29 @@ public class MainActivity extends AppCompatActivity {
             }
 
             MediaItem currentItem = mediaController.getCurrentMediaItem();
-            if (currentItem != null && currentItem.mediaMetadata.title != null) {
-                currentTrackTitle.setText(currentItem.mediaMetadata.title);
-                currentTrackArtist.setText(currentItem.mediaMetadata.artist);
-                
-                if (currentItem.mediaMetadata.artworkUri != null) {
-                    Glide.with(this)
-                            .load(currentItem.mediaMetadata.artworkUri)
-                            .placeholder(R.drawable.ic_launcher_foreground)
-                            .into(albumArt);
-                } else {
-                    albumArt.setImageResource(R.drawable.ic_launcher_foreground);
+            if (currentItem != null) {
+                if (adapter != null && currentItem.mediaId != null) {
+                    adapter.setSelectedTrackPath(currentItem.mediaId);
+                }
+
+                // Optimization: Only update UI text and art if the track actually changed
+                if (lastLoadedMediaId == null || !lastLoadedMediaId.equals(currentItem.mediaId)) {
+                    lastLoadedMediaId = currentItem.mediaId;
+                    
+                    if (currentItem.mediaMetadata.title != null) {
+                        currentTrackTitle.setText(currentItem.mediaMetadata.title);
+                        currentTrackArtist.setText(currentItem.mediaMetadata.artist);
+
+                        if (currentItem.mediaMetadata.artworkUri != null) {
+                            Glide.with(this)
+                                    .load(currentItem.mediaMetadata.artworkUri)
+                                    .transition(DrawableTransitionOptions.withCrossFade())
+                                    .placeholder(R.drawable.ic_launcher_foreground)
+                                    .into(albumArt);
+                        } else {
+                            albumArt.setImageResource(R.drawable.ic_launcher_foreground);
+                        }
+                    }
                 }
             }
             if (mediaController.getPlaybackState() == Player.STATE_READY) {

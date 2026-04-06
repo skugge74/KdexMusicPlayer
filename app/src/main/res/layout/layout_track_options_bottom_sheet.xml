@@ -61,6 +61,30 @@
     </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPlayNext"
+        style="@style/Widget.Material3.Button.TextButton.Icon"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Play Next"
+        android:gravity="start|center_vertical"
+        android:textColor="?attr/colorOnSurface"
+        app:icon="@drawable/ic_play"
+        app:iconTint="?attr/colorPrimary"
+        app:iconPadding="16dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAddToQueue"
+        style="@style/Widget.Material3.Button.TextButton.Icon"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Add to Queue"
+        android:gravity="start|center_vertical"
+        android:textColor="?attr/colorOnSurface"
+        app:icon="@drawable/ic_playlist_add"
+        app:iconTint="?attr/colorPrimary"
+        app:iconPadding="16dp" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btnEditInfo"
         style="@style/Widget.Material3.Button.TextButton.Icon"
         android:layout_width="match_parent"
